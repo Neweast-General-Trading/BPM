@@ -1482,6 +1482,82 @@ export function fetchUploadedAttachments() {
   return request<UploadedAttachmentItem[]>('/departments/administration/attachments');
 }
 
+function authHeaders(): Record<string, string> {
+  const profile = loadAccessProfile();
+  const token =
+    typeof window !== 'undefined' ? window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY) : null;
+  const headers: Record<string, string> = {};
+  if (token?.trim()) {
+    headers.Authorization = `Bearer ${token.trim()}`;
+  } else if (profile.email?.trim()) {
+    headers['x-user-email'] = profile.email.trim().toLowerCase();
+  }
+  return headers;
+}
+
+export function uploadActivityAttachments(
+  departmentId: string,
+  processId: string,
+  activityId: string,
+  files: File[],
+) {
+  const formData = new FormData();
+  files.forEach((file) => formData.append('files', file));
+  return requestMultipart<BpmProcess>(
+    `/departments/${departmentId}/processes/${processId}/activities/${activityId}/attachments`,
+    formData,
+  );
+}
+
+export function deleteActivityAttachment(
+  departmentId: string,
+  processId: string,
+  activityId: string,
+  attachmentId: string,
+) {
+  return request<BpmProcess>(
+    `/departments/${departmentId}/processes/${processId}/activities/${activityId}/attachments/${attachmentId}`,
+    { method: 'DELETE' },
+  );
+}
+
+export async function openActivityAttachment(
+  departmentId: string,
+  processId: string,
+  activityId: string,
+  attachmentId: string,
+  originalName: string,
+  mode: 'view' | 'download',
+): Promise<void> {
+  const disposition = mode === 'view' ? 'inline' : 'attachment';
+  const response = await fetch(
+    `${API_BASE_URL}/departments/${departmentId}/processes/${processId}/activities/${activityId}/attachments/${attachmentId}/file?disposition=${disposition}`,
+    { headers: authHeaders() },
+  );
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { message?: string | string[] } | null;
+    const message = Array.isArray(body?.message) ? body.message.join(', ') : body?.message;
+    throw new Error(message ?? 'Could not open the file.');
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  if (mode === 'view') {
+    const opened = window.open(url, '_blank', 'noopener');
+    if (!opened) {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = originalName || 'attachment';
+      link.click();
+    }
+  } else {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = originalName || 'attachment';
+    link.click();
+  }
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 export function getActivityCommentAttachmentUrl(
   departmentId: string,
   processId: string,

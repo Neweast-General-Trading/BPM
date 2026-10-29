@@ -1,5 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 
+import { formatTatHoursDisplay } from 'src/common/tat-hours.util';
+
 import type { TemplateColumn } from './ai-bpm-detail-values';
 import { resolveDetailValue } from './ai-bpm-detail-values';
 import type {
@@ -103,7 +105,7 @@ const DETAIL_ALIASES: Record<keyof ProcessStep, string[]> = {
     'No of FTE interactions',
     'FTE interactions',
   ],
-  TAT: ['TAT', 'TAT (Days)', 'TAT Days'],
+  TAT: ['TAT', 'TAT (Hours)', 'TAT (Minutes)', 'TAT (Days)', 'TAT Days'],
   'TAT Remarks': ['TAT Remarks'],
   'Wait/Delay Time': [
     'Wait/Delay Time',
@@ -200,6 +202,10 @@ export function toProcessJson(subs: PipelineSub[]): ProcessStep[] {
           step['Linked Processes'] =
             detailValue(sub.details, DETAIL_ALIASES['Linked Processes']) ||
             (sub.relatedPolicies ?? []).join(', ');
+        } else if (key === 'TAT') {
+          step.TAT = formatTatHoursDisplay(
+            detailValue(sub.details, DETAIL_ALIASES.TAT),
+          );
         } else {
           (step as Record<string, string | number>)[key] = detailValue(
             sub.details,

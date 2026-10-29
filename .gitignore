@@ -25,6 +25,7 @@ payload/
 .run/
 *.sql
 *.sql.gz
+bpm-api/storage/
 bpm-api/docx/BPM-Files/
 bpm-api/docx/BPM-FILES/
 bpm-api/docx/*.docx

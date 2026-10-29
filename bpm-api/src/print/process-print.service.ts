@@ -14,6 +14,7 @@ import { promisify } from 'node:util';
 import { Repository } from 'typeorm';
 
 import { parseApprovalFlow } from 'src/common/activity-template-field-types';
+import { formatTatHoursDisplay, isTatHoursField } from 'src/common/tat-hours.util';
 import { findChrome } from 'src/ai-bpm/ai-bpm-mermaid-images';
 import { ActivityTemplateEntity } from 'src/activity-templates/entities/activity-template.entity';
 import { Department } from 'src/departments/entities/department.entity';
@@ -141,6 +142,7 @@ const GROUPS: GroupDef[] = [
     names: [
       'tat',
       'tatminutes',
+      'tathours',
       'waitdelaytime',
       'waitdelaytimeminutes',
       'processtype',
@@ -221,6 +223,7 @@ function groupOf(f: Field): { def: GroupDef; order: number } | null {
 }
 
 function valueFor(f: Field, raw: unknown): string {
+  if (isTatHoursField(f)) return formatTatHoursDisplay(raw);
   let text = asText(raw);
   if (f.type === 'numeric_days') {
     text = text.replace(/\s*(days?|minutes?|mins?|hrs?|hours?)\s*$/i, '');

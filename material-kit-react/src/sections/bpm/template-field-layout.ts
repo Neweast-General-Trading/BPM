@@ -36,7 +36,7 @@ export const FIELD_GROUPS: FieldGroupDef[] = [
     id: 'timing',
     title: 'Timing & execution',
     color: 'warning',
-    names: ['tat', 'tatminutes', 'waitdelaytime', 'waitdelaytimeminutes', 'processtype', 'frequency'],
+    names: ['tat', 'tatminutes', 'tathours', 'waitdelaytime', 'waitdelaytimeminutes', 'processtype', 'frequency'],
   },
   {
     id: 'roles',

@@ -26,6 +26,7 @@ import {
   ActivityTemplateEntity,
   type ActivityTemplateField,
 } from 'src/activity-templates/entities/activity-template.entity';
+import { ActivityAttachmentEntity } from 'src/activities/entities/activity-attachment.entity';
 import { ActivityCommentAttachmentEntity } from 'src/activities/entities/activity-comment-attachment.entity';
 import { ActivityCommentEntity } from 'src/activities/entities/activity-comment.entity';
 import { ActivityEntity } from 'src/activities/entities/activity.entity';
@@ -110,6 +111,8 @@ export class DepartmentsService {
     private readonly activityCommentRepository: Repository<ActivityCommentEntity>,
     @InjectRepository(ActivityCommentAttachmentEntity)
     private readonly activityCommentAttachmentRepository: Repository<ActivityCommentAttachmentEntity>,
+    @InjectRepository(ActivityAttachmentEntity)
+    private readonly activityAttachmentRepository: Repository<ActivityAttachmentEntity>,
     @InjectRepository(ActivityTemplateEntity)
     private readonly activityTemplateRepository: Repository<ActivityTemplateEntity>,
     @InjectRepository(AccessUserEntity)
@@ -2114,7 +2117,9 @@ export class DepartmentsService {
   ): Promise<ProcessEntity> {
     const process = await this.processRepository.findOne({
       where: { id: processId, departmentId },
-      relations: { activities: { comments: { attachments: true } } },
+      relations: {
+        activities: { comments: { attachments: true }, attachments: true },
+      },
       order: { activities: { createdAt: 'ASC' } },
     });
 
@@ -2127,6 +2132,12 @@ export class DepartmentsService {
         requestingUserEmail,
         departmentId,
         processId,
+      );
+    }
+
+    for (const activity of process.activities ?? []) {
+      activity.attachments?.sort(
+        (a, b) => +new Date(a.createdAt) - +new Date(b.createdAt),
       );
     }
 
@@ -2765,6 +2776,9 @@ export class DepartmentsService {
       }
     }
     const ids = Array.from(toDeleteIds);
+    const attachmentPaths = process.activities
+      .filter((row) => toDeleteIds.has(row.id))
+      .flatMap((row) => (row.attachments ?? []).map((file) => file.storedPath));
 
     await this.dataSource.transaction(async (manager) => {
       await manager.delete(ActivityCommentEntity, { activityId: In(ids) });
@@ -2846,6 +2860,7 @@ export class DepartmentsService {
         );
       }
     });
+    await this.deleteStoredActivityFiles(attachmentPaths);
     return { deleted: true as const };
   }
 
@@ -3062,6 +3077,199 @@ export class DepartmentsService {
       fileName: comment.attachmentOriginalName || 'comment-attachment',
       mimeType: comment.attachmentMimeType || 'application/octet-stream',
     };
+  }
+
+  private activityAttachmentRoot(): string {
+    return path.resolve(process.cwd(), 'storage', 'sub-process-attachments');
+  }
+
+  private resolveActivityAttachmentPath(storedPath: string): string {
+    const root = this.activityAttachmentRoot();
+    const absolute = path.resolve(process.cwd(), storedPath);
+    const relative = path.relative(root, absolute);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+      throw new NotFoundException('Attachment file is missing.');
+    }
+    return absolute;
+  }
+
+  private async deleteStoredActivityFiles(storedPaths: string[]): Promise<void> {
+    await Promise.all(
+      storedPaths.map(async (storedPath) => {
+        try {
+          await fs.unlink(this.resolveActivityAttachmentPath(storedPath));
+        } catch {
+          // The row is already gone; a missing file should not fail the request.
+        }
+      }),
+    );
+  }
+
+  private async saveActivityAttachmentFile(
+    fileBuffer: Buffer,
+    activityCode: string,
+    originalName?: string,
+  ): Promise<{ storedPath: string; originalName: string; storedFileName: string }> {
+    const allowed = new Set([
+      'pdf',
+      'doc',
+      'docx',
+      'xls',
+      'xlsx',
+      'ppt',
+      'pptx',
+      'png',
+      'jpg',
+      'jpeg',
+      'gif',
+      'webp',
+      'txt',
+      'csv',
+      'zip',
+    ]);
+    const cleanOriginal = (originalName || 'attachment').trim() || 'attachment';
+    const ext = path.extname(cleanOriginal).replace('.', '').toLowerCase();
+    if (!allowed.has(ext)) {
+      throw new BadRequestException(
+        `File type .${ext || 'unknown'} is not allowed. Use PDF, Office, image, text, CSV, or ZIP files.`,
+      );
+    }
+    if (!fileBuffer?.length) {
+      throw new BadRequestException('The uploaded file is empty.');
+    }
+    if (fileBuffer.length > 25 * 1024 * 1024) {
+      throw new BadRequestException('Each file must be 25 MB or smaller.');
+    }
+    const safeCode = (activityCode || 'sub-process')
+      .replace(/[^a-zA-Z0-9._-]+/g, '_')
+      .slice(0, 80);
+    const safeName = cleanOriginal.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 120);
+    const storedFileName = `${Date.now()}-${randomUUID()}-${safeName}`;
+    const dir = path.join(this.activityAttachmentRoot(), safeCode);
+    await fs.mkdir(dir, { recursive: true });
+    const absolute = path.join(dir, storedFileName);
+    await fs.writeFile(absolute, fileBuffer);
+    return {
+      storedPath: path.relative(process.cwd(), absolute).replace(/\\/g, '/'),
+      originalName: cleanOriginal.slice(0, 255),
+      storedFileName,
+    };
+  }
+
+  async uploadActivityAttachments(
+    departmentId: string,
+    processId: string,
+    activityId: string,
+    files: Array<{ buffer: Buffer; originalname?: string; mimetype?: string }>,
+    requestingUserEmail?: string | null,
+  ) {
+    const loaded = await this.loadProcessEntity(
+      departmentId,
+      processId,
+      requestingUserEmail,
+    );
+    const activity = loaded.activities.find((item) => item.id === activityId);
+    if (!activity) {
+      throw new NotFoundException('Sub-process not found in this process.');
+    }
+    const incoming = (files ?? []).filter((file) => file?.buffer?.length);
+    if (!incoming.length) {
+      throw new BadRequestException('Choose at least one file to upload.');
+    }
+    const existingCount = activity.attachments?.length ?? 0;
+    if (existingCount + incoming.length > 30) {
+      throw new BadRequestException(
+        'A sub-process can have at most 30 attachments.',
+      );
+    }
+    const uploadedByName = await this.resolveCommentAuthorLabel(requestingUserEmail);
+    const uploadedByEmail = requestingUserEmail?.trim().toLowerCase() || '';
+    const savedPaths: string[] = [];
+    const savedIds: string[] = [];
+    try {
+      for (const file of incoming) {
+        const stored = await this.saveActivityAttachmentFile(
+          file.buffer,
+          activity.code,
+          file.originalname,
+        );
+        savedPaths.push(stored.storedPath);
+        const row = await this.activityAttachmentRepository.save(
+          this.activityAttachmentRepository.create({
+            activityId: activity.id,
+            originalName: stored.originalName,
+            mimeType: file.mimetype?.trim() || null,
+            storedPath: stored.storedPath,
+            storedFileName: stored.storedFileName,
+            fileSize: file.buffer.length,
+            uploadedByEmail,
+            uploadedByName,
+          }),
+        );
+        savedIds.push(row.id);
+      }
+    } catch (err) {
+      if (savedIds.length) {
+        await this.activityAttachmentRepository.delete({ id: In(savedIds) });
+      }
+      await this.deleteStoredActivityFiles(savedPaths);
+      throw err;
+    }
+    return this.findProcess(departmentId, processId, requestingUserEmail);
+  }
+
+  async getActivityAttachment(
+    departmentId: string,
+    processId: string,
+    activityId: string,
+    attachmentId: string,
+    requestingUserEmail?: string | null,
+  ): Promise<{ filePath: string; fileName: string; mimeType: string }> {
+    await this.loadProcessEntity(departmentId, processId, requestingUserEmail);
+    const row = await this.activityAttachmentRepository.findOne({
+      where: { id: attachmentId, activityId },
+    });
+    if (!row) {
+      throw new NotFoundException('Attachment not found.');
+    }
+    const absolute = this.resolveActivityAttachmentPath(row.storedPath);
+    try {
+      await fs.access(absolute);
+    } catch {
+      throw new NotFoundException('Attachment file is missing.');
+    }
+    return {
+      filePath: absolute,
+      fileName: row.originalName || 'attachment',
+      mimeType: row.mimeType || 'application/octet-stream',
+    };
+  }
+
+  async removeActivityAttachment(
+    departmentId: string,
+    processId: string,
+    activityId: string,
+    attachmentId: string,
+    requestingUserEmail?: string | null,
+  ) {
+    const loaded = await this.loadProcessEntity(
+      departmentId,
+      processId,
+      requestingUserEmail,
+    );
+    const activity = loaded.activities.find((item) => item.id === activityId);
+    if (!activity) {
+      throw new NotFoundException('Sub-process not found in this process.');
+    }
+    const row = await this.activityAttachmentRepository.findOne({
+      where: { id: attachmentId, activityId },
+    });
+    if (!row) {
+      throw new NotFoundException('Attachment not found.');
+    }
+    await this.activityAttachmentRepository.delete({ id: row.id });
+    await this.deleteStoredActivityFiles([row.storedPath]);
+    return this.findProcess(departmentId, processId, requestingUserEmail);
   }
 
   async listUploadedAttachments(requestingUserEmail?: string | null) {

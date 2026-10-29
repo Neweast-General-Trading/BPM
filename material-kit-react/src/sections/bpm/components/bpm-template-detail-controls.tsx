@@ -11,6 +11,7 @@ import { NumberOnlyField } from 'src/sections/bpm/components/number-only-field';
 import { NumericDaysField } from 'src/sections/bpm/components/numeric-days-field';
 import { ApprovalFlowField } from 'src/sections/bpm/components/approval-flow-field';
 import { templateFieldIsRaciRoleField } from 'src/sections/bpm/raci-role-fields.util';
+import { isTatHoursField, formatTatHoursDisplay } from 'src/sections/bpm/tat-hours.util';
 import { AppMasterMultiSelect } from 'src/sections/bpm/components/app-master-multi-select';
 import { mergeRaciDesignationOptions } from 'src/sections/bpm/raci-designation-options.util';
 import {
@@ -40,8 +41,8 @@ export function detailValueAsString(field: ActivityTemplateField, value: unknown
   ) {
     return formatMultiSelectDisplay(value);
   }
-  if (field.type === 'numeric_days') {
-    return formatNumericDaysDisplay(value);
+  if (field.type === 'numeric_days' || isTatHoursField(field)) {
+    return isTatHoursField(field) ? formatTatHoursDisplay(value) : formatNumericDaysDisplay(value);
   }
   if (field.type === 'approval_flow') {
     return formatApprovalFlow(value);
@@ -97,6 +98,7 @@ export function renderTemplateDetailFieldInput(
   }
 
   if (field.type === 'numeric_days') {
+    const tatPreview = isTatHoursField(field) ? formatTatHoursDisplay(stringValue) : '';
     return (
       <NumericDaysField
         key={field.key}
@@ -104,6 +106,7 @@ export function renderTemplateDetailFieldInput(
         value={stringValue}
         disabled={disabled}
         size="medium"
+        helperText={tatPreview && tatPreview !== stringValue.trim() ? tatPreview : undefined}
         onChange={(next) => onChange(next)}
       />
     );
@@ -273,13 +276,16 @@ export function renderTemplateDetailFieldView(
   }
 
   if (field.type === 'numeric_days') {
+    const shown = isTatHoursField(field)
+      ? formatTatHoursDisplay(display)
+      : formatNumericDaysDisplay(display);
     return (
       <TextField
         key={field.key}
         fullWidth
         disabled
         label={field.label}
-        value={formatNumericDaysDisplay(display) || '—'}
+        value={shown || '—'}
         InputProps={{ readOnly: true }}
       />
     );

@@ -16,7 +16,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { AnyFilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
+import { AnyFilesInterceptor, FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
 import { createReadStream } from 'node:fs';
 import { PERMISSIONS } from 'src/access-control/access-control.constants';
@@ -563,6 +563,76 @@ export class DepartmentsController {
       departmentId,
       processId,
       activityId,
+      this.resolveRequestingUserEmail(req),
+    );
+  }
+
+  @Post(':departmentId/processes/:processId/activities/:activityId/attachments')
+  @UseInterceptors(
+    FilesInterceptor('files', 15, {
+      limits: { fileSize: 25 * 1024 * 1024 },
+    }),
+  )
+  @RequirePermission(PERMISSIONS.activities)
+  uploadActivityAttachments(
+    @Req() req: Request,
+    @Param('departmentId') departmentId: string,
+    @Param('processId') processId: string,
+    @Param('activityId') activityId: string,
+    @UploadedFiles() files?: UploadedAttachmentFile[],
+  ) {
+    return this.departmentsService.uploadActivityAttachments(
+      departmentId,
+      processId,
+      activityId,
+      files ?? [],
+      this.resolveRequestingUserEmail(req),
+    );
+  }
+
+  @Get(
+    ':departmentId/processes/:processId/activities/:activityId/attachments/:attachmentId/file',
+  )
+  @RequirePermission(PERMISSIONS.processes, PERMISSIONS.activities)
+  async downloadActivityAttachment(
+    @Req() req: Request,
+    @Param('departmentId') departmentId: string,
+    @Param('processId') processId: string,
+    @Param('activityId') activityId: string,
+    @Param('attachmentId') attachmentId: string,
+    @Query('disposition') disposition?: string,
+  ) {
+    const file = await this.departmentsService.getActivityAttachment(
+      departmentId,
+      processId,
+      activityId,
+      attachmentId,
+      this.resolveRequestingUserEmail(req),
+    );
+    const inline = disposition === 'inline';
+    const safeName = file.fileName.replace(/["\r\n]/g, '');
+    return new StreamableFile(createReadStream(file.filePath), {
+      type: file.mimeType,
+      disposition: `${inline ? 'inline' : 'attachment'}; filename="${safeName}"`,
+    });
+  }
+
+  @Delete(
+    ':departmentId/processes/:processId/activities/:activityId/attachments/:attachmentId',
+  )
+  @RequirePermission(PERMISSIONS.activities)
+  removeActivityAttachment(
+    @Req() req: Request,
+    @Param('departmentId') departmentId: string,
+    @Param('processId') processId: string,
+    @Param('activityId') activityId: string,
+    @Param('attachmentId') attachmentId: string,
+  ) {
+    return this.departmentsService.removeActivityAttachment(
+      departmentId,
+      processId,
+      activityId,
+      attachmentId,
       this.resolveRequestingUserEmail(req),
     );
   }

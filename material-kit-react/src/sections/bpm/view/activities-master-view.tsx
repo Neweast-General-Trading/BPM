@@ -341,7 +341,7 @@ export function ActivitiesMasterView() {
                           <MenuItem value="textarea">Textarea</MenuItem>
                           <MenuItem value="yes_no">Yes / No</MenuItem>
                           <MenuItem value="number">Number</MenuItem>
-                          <MenuItem value="numeric_days">Numeric (Minutes)</MenuItem>
+                          <MenuItem value="numeric_days">Numeric (duration)</MenuItem>
                           <MenuItem value="oracle_job_role_multi">Oracle Job Role (Multi)</MenuItem>
                           <MenuItem value="dropdown_job_title">Dropdown (Job Title)</MenuItem>
                           <MenuItem value="dropdown_person_name">Dropdown (Personal Name)</MenuItem>

@@ -10,6 +10,7 @@ import {
   Unique,
   UpdateDateColumn,
 } from 'typeorm';
+import { ActivityAttachmentEntity } from './activity-attachment.entity';
 import { ActivityCommentEntity } from './activity-comment.entity';
 import { ProcessEntity } from 'src/processes/entities/process.entity';
 
@@ -104,6 +105,9 @@ export class ActivityEntity {
 
   @OneToMany(() => ActivityCommentEntity, (comment) => comment.activity)
   comments: ActivityCommentEntity[];
+
+  @OneToMany(() => ActivityAttachmentEntity, (file) => file.activity)
+  attachments: ActivityAttachmentEntity[];
 
   @CreateDateColumn()
   createdAt: Date;

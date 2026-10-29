@@ -5,6 +5,7 @@ import { parseNumericDaysInput } from 'src/sections/bpm/numeric-field.util';
 type Props = {
   value: string | number | null | undefined;
   label?: string;
+  helperText?: string;
   disabled?: boolean;
   saving?: boolean;
   fullWidth?: boolean;
@@ -16,6 +17,7 @@ type Props = {
 export function NumericDaysField({
   value,
   label,
+  helperText,
   disabled = false,
   saving = false,
   fullWidth = true,
@@ -34,6 +36,7 @@ export function NumericDaysField({
       type="number"
       inputProps={{ min: 0, step: 'any', inputMode: 'decimal' }}
       value={numericOnly}
+      helperText={helperText}
       onClick={(event) => event.stopPropagation()}
       onChange={(event) => onChange(parseNumericDaysInput(event.target.value))}
       sx={{

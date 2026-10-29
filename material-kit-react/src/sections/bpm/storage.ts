@@ -96,6 +96,8 @@ export type ActivityItem = {
   relatedSubProcesses?: RelatedSubProcessLink[];
   /** Policy Creator policies linked to this sub-process. */
   relatedPolicies?: RelatedPolicyLink[];
+  /** Files stored on the server for this sub-process. */
+  attachments?: ActivityAttachment[];
   /**
    * Per-vendor overlays keyed by lowercased email of the uploading user. Original values are
    * never overwritten — the overlay carries a parallel copy of name / description / details
@@ -133,6 +135,17 @@ export type ActivityTemplate = {
   name: string;
   description?: string | null;
   fields: ActivityTemplateField[];
+  createdAt: string;
+};
+
+export type ActivityAttachment = {
+  id: string;
+  activityId: string;
+  originalName: string;
+  mimeType?: string | null;
+  fileSize: number;
+  uploadedByName: string;
+  uploadedByEmail?: string;
   createdAt: string;
 };
 

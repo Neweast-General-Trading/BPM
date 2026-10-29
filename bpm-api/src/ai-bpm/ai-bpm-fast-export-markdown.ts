@@ -7,6 +7,7 @@ import {
   buildAuthoritativeDataMarkdown,
   type TemplateColumn,
 } from './ai-bpm-authoritative-data';
+import { formatTatHoursDisplay, isTatHoursField } from 'src/common/tat-hours.util';
 import { formatTableCell, resolveDetailValue } from './ai-bpm-detail-values';
 import {
   relatedPolicyMarkdown,
@@ -58,7 +59,8 @@ function resolveColumnValue(
   details: Record<string, string | string[]> | undefined,
   column: TemplateColumn,
 ): string {
-  return resolveDetailValue(details, column);
+  const value = resolveDetailValue(details, column);
+  return isTatHoursField(column) ? formatTatHoursDisplay(value) : value;
 }
 
 function foldFieldKey(s: string): string {
@@ -306,13 +308,13 @@ function fullRegister(
         if (usedFold.has(foldFieldKey(key))) continue;
         if (!formatTableCell(value) || formatTableCell(value) === '—') continue;
         usedFold.add(foldFieldKey(key));
-        blocks.push(`| ${esc(key)} | ${esc(value)} |`);
+        blocks.push(`| ${esc(key)} | ${esc(isTatHoursField({ key }) ? formatTatHoursDisplay(value) : value)} |`);
       }
     } else {
       for (const [key, value] of Object.entries(sp.details ?? {})) {
         if (usedFold.has(foldFieldKey(key))) continue;
         usedFold.add(foldFieldKey(key));
-        blocks.push(`| ${esc(key)} | ${esc(value)} |`);
+        blocks.push(`| ${esc(key)} | ${esc(isTatHoursField({ key }) ? formatTatHoursDisplay(value) : value)} |`);
       }
     }
     // 2) Related sub-process title  3) Policy body

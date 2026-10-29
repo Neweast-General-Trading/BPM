@@ -6,6 +6,7 @@ import { HanaModule } from 'src/hana/hana.module';
 import { ActivityTemplatesModule } from 'src/activity-templates/activity-templates.module';
 import { AccessUserEntity } from 'src/access-control/entities/user.entity';
 import { ActivityTemplateEntity } from 'src/activity-templates/entities/activity-template.entity';
+import { ActivityAttachmentEntity } from 'src/activities/entities/activity-attachment.entity';
 import { ActivityCommentAttachmentEntity } from 'src/activities/entities/activity-comment-attachment.entity';
 import { ActivityCommentEntity } from 'src/activities/entities/activity-comment.entity';
 import { ActivityEntity } from 'src/activities/entities/activity.entity';
@@ -36,6 +37,7 @@ import { UserLogReaderService } from 'src/maintenance/user-log-reader.service';
       ActivityPolicyLinkEntity,
       ActivityCommentEntity,
       ActivityCommentAttachmentEntity,
+      ActivityAttachmentEntity,
       ActivityTemplateEntity,
       AccessUserEntity,
       ApplicationEntity,

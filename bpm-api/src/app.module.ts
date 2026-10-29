@@ -9,6 +9,7 @@ import { ActivityPrintModule } from './print/activity-print.module';
 import { ApplicationEntity } from './applications/entities/application.entity';
 import { ActivityTemplatesModule } from './activity-templates/activity-templates.module';
 import { ActivityTemplateEntity } from './activity-templates/entities/activity-template.entity';
+import { ActivityAttachmentEntity } from './activities/entities/activity-attachment.entity';
 import { ActivityCommentAttachmentEntity } from './activities/entities/activity-comment-attachment.entity';
 import { ActivityCommentEntity } from './activities/entities/activity-comment.entity';
 import { ActivityEntity } from './activities/entities/activity.entity';
@@ -49,6 +50,7 @@ import { SystemHealthService } from './system-health/system-health.service';
         ActivityPolicyLinkEntity,
         ActivityCommentEntity,
         ActivityCommentAttachmentEntity,
+        ActivityAttachmentEntity,
         ActivityTemplateEntity,
         PermissionEntity,
         RoleEntity,
